@@ -1,0 +1,5 @@
+git init
+git commit -m "xcxxxx"
+git remote add origin https://github.com/krissmb/euro6_class
+git add ........
+git push -u origin main
