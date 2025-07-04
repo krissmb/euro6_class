@@ -1,64 +1,66 @@
 import cv2
 from ultralytics import YOLO
 
-# Загрузить модель
-model = YOLO('best.pt')  # путь к твоей модели
+# Загрузка модели
+model = YOLO('best.pt')
 
-# Путь к видеофайлу
-video_path = 'video.mp4'
+video_path = 'video.mp4'  # путь к видео
 
-# Открываем видео
 cap = cv2.VideoCapture(video_path)
-
 if not cap.isOpened():
-    print("Ошибка открытия видеофайла")
+    print("Ошибка открытия видео")
     exit()
 
 paused = False
 frame_pos = 0
-total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
 while True:
     if not paused:
         ret, frame = cap.read()
         if not ret:
-            print("Достигнут конец видео или ошибка чтения")
+            print("Видео завершилось")
             break
-        frame_pos = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
+        frame_pos = int(cap.get(cv2.CAP_PROP_POS_FRAMES)) - 1  # Индекс текущего кадра (read уже сместил)
+
     else:
-        # Если на паузе, просто получаем текущий кадр
+        # В режиме паузы устанавливаем позицию и считываем кадр
         cap.set(cv2.CAP_PROP_POS_FRAMES, frame_pos)
         ret, frame = cap.read()
         if not ret:
+            print("Ошибка при чтении кадра в паузе")
             break
 
-    # Выполняем детекцию
     results = model(frame)
-
-    # Отрисовка результатов на кадре (YOLOv8 умеет рисовать сам)
     annotated_frame = results[0].plot()
 
-    cv2.putText(annotated_frame, f'Frame: {frame_pos}/{total_frames}', (10,30),
-                cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
+    if paused:
+        info_text = "PAUSED | SPACE - play | <- / -> - rewind | Q / ESC - exit"
+        color = (255, 255, 0)
+    else:
+        info_text = "SPACE - pause/play | <- / -> - rewind | Q / ESC - exit"
+        color = (255, 50, 50)
 
-    cv2.imshow('YOLOv8 Detection', annotated_frame)
+    cv2.putText(annotated_frame, info_text, (10, 30),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+    cv2.imshow("Detection", annotated_frame)
 
-    key = cv2.waitKey(30) & 0xFF
+    key = cv2.waitKey(30)  # НЕ используем & 0xFF для стрелок
 
-    if key == ord('q'):
-        # Выход по q
-        break
-    elif key == ord('p'):
-        # Пауза / продолжение по p
+    if key == ord(' '):  # Пауза/плей
         paused = not paused
-    elif key == ord('d'):
-        # Перемотка вперёд на 30 кадров (~1 секунда при 30fps)
-        frame_pos = min(frame_pos + 30, total_frames - 1)
+
+    elif key == 27 or key == ord('q'):  # ESC или q — выход
+        break
+
+    elif key == 81:  # Левая стрелка (перемотка назад)
+        frame_pos = max(0, frame_pos - 30)
         cap.set(cv2.CAP_PROP_POS_FRAMES, frame_pos)
-    elif key == ord('a'):
-        # Перемотка назад на 30 кадров
-        frame_pos = max(frame_pos - 30, 0)
+        paused = True
+
+    elif key == 83:  # Правая стрелка (перемотка вперед)
+        frame_pos = min(int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) - 1, frame_pos + 30)
         cap.set(cv2.CAP_PROP_POS_FRAMES, frame_pos)
+        paused = True
 
 cap.release()
 cv2.destroyAllWindows()
